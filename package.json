@@ -1,0 +1,12 @@
+{
+  "name": "dor-queue",
+  "version": "0.1.0",
+  "description": "دور — Arabic, low-bandwidth queue tickets and pickup orders (bread lines, water, barbers, restaurants)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --no-warnings src/server.js",
+    "test": "DB_FILE=:memory: node --no-warnings --test test/flow.test.js"
+  },
+  "engines": { "node": ">=22.5" },
+  "license": "MIT"
+}
