@@ -47,7 +47,7 @@ function cookies(req) {
 function send(req, res, status, html, headers = {}) {
   let body = Buffer.from(html);
   const h = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
+    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin',
     'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'", ...headers };
   if (/\bgzip\b/.test(req.headers['accept-encoding'] || '') && body.length > 600) {
     body = zlib.gzipSync(body, { level: 9 }); h['Content-Encoding'] = 'gzip';
@@ -238,7 +238,7 @@ ${action(b, 'إلغاء', 'btn2', { status: 'cancelled' })}</div></td></tr>`;
   return page('لوحة المحل', `<h1>${esc(store.name)}</h1>
 ${msg ? `<div class="notice">${esc(msg)}</div>` : ''}
 <div class="card"><p>رمز محلك للزبائن: <b style="font-size:1.4em">${esc(store.code)}</b></p>
-<p class="muted">صفحة الحجز: <a href="/s/${esc(store.code)}">/s/${esc(store.code)}</a> · شاشة العرض: <a href="/s/${esc(store.code)}/screen">/s/${esc(store.code)}/screen</a></p>
+<p class="muted">صفحة الحجز: <a href="/s/${esc(store.code)}" dir="ltr">/s/${esc(store.code)}</a> · شاشة العرض: <a href="/s/${esc(store.code)}/screen" dir="ltr">/s/${esc(store.code)}/screen</a></p>
 <p><a class="btn btn2" href="/dash">تحديث</a></p></div>
 ${qHtml}
 <form method="post" class="card" action="/dash/queue"><h2>إضافة طابور</h2>
@@ -264,7 +264,10 @@ async function handle(req, res) {
   const ip = req.socket.remoteAddress || '';
   const post = req.method === 'POST';
   // Basic CSRF defence: cross-site POSTs are refused (cookie is also SameSite=Lax).
-  if (post && req.headers.origin && req.headers.host && new URL(req.headers.origin).host !== req.headers.host) {
+  const origin = req.headers.origin;
+  let originHost = null;
+  try { if (origin && origin !== 'null') originHost = new URL(origin).host; } catch {}
+  if (post && originHost && req.headers.host && originHost !== req.headers.host) {
     return send(req, res, 403, page('مرفوض', '<p>طلب مرفوض.</p>'));
   }
   const body = post ? await readBody(req) : {};
