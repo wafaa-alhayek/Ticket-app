@@ -6,6 +6,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Inline CSS (no external files, no web fonts: system Arabic fonts only).
+const FAVICON = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"%3E%3Crect width="16" height="16" rx="3" fill="#14532d"/%3E%3Cpath fill="#facc15" d="M2 4h12v2.6a1.4 1.4 0 0 0 0 2.8V12H2V9.4a1.4 1.4 0 0 0 0-2.8z"/%3E%3Cpath fill="#14532d" d="M10 5.3h1v1h-1zm0 2.2h1v1h-1zm0 2.2h1v1h-1zM4 6.6h4.5v1.3H4zm1.5 2H8.5v1.2h-3z"/%3E%3C/svg%3E';
 const CSS = `
 *{box-sizing:border-box}
 body{margin:0;font-family:Tahoma,"Segoe UI","Noto Naskh Arabic",Arial,sans-serif;background:#f4f1ea;color:#1d1d1b;line-height:1.6;font-size:17px}
@@ -15,7 +16,7 @@ main{max-width:720px;margin:0 auto;padding:16px}
 h1{font-size:1.4em;margin:.3em 0}h2{font-size:1.15em;margin:.8em 0 .3em}
 .card{background:#fff;border:1px solid #ddd6c8;border-radius:10px;padding:14px;margin:12px 0}
 label{display:block;margin:8px 0 2px;font-weight:bold}
-input,select,textarea{width:100%;min-height:44px;padding:10px;font-size:1em;border:1px solid #b9b2a3;border-radius:8px;background:#fff;font-family:inherit}
+input,select,textarea{width:100%;min-height:44px;padding:10px;font-size:1em;border:1px solid #8a8373;border-radius:8px;background:#fff;font-family:inherit}
 button,.btn{display:inline-block;min-height:44px;min-width:44px;padding:10px 16px;font-size:1em;border:0;border-radius:8px;background:#14532d;color:#fff;cursor:pointer;text-decoration:none;font-family:inherit;margin:4px 0}
 .btn2{background:#e7e2d6;color:#1d1d1b}.warn{background:#9a3412}.big{font-size:1.25em;padding:14px 22px;width:100%}
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #b45309;outline-offset:2px}
@@ -24,7 +25,7 @@ header a{display:inline-block;padding:8px 4px;min-height:44px}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row form{margin:0}
 .num{font-size:4.5em;font-weight:bold;text-align:center;color:#14532d;line-height:1.1}
-.muted{color:#6b6556;font-size:.9em}.ok{color:#14532d;font-weight:bold}.bad{color:#9a3412;font-weight:bold}
+.muted{color:#5c5648;font-size:.9em}.ok{color:#14532d;font-weight:bold}.bad{color:#9a3412;font-weight:bold}
 .notice{background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px;margin:10px 0}
 .called{background:#dcfce7;border:2px solid #16a34a}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #eee;text-align:right}
@@ -35,6 +36,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px so
 function page(title, body, { refresh, bare, nav = '', css = '' } = {}) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="${FAVICON}">
 ${refresh ? `<meta http-equiv="refresh" content="${refresh}">` : ''}
 <title>${esc(title)} · دور</title><style>${CSS}${css}</style></head><body>
 ${bare ? body : `<header><a href="/" aria-label="دور — الرئيسية"><span aria-hidden="true">🎫</span> دور</a><nav>${nav}</nav></header><main id="main">${body}</main>`}

@@ -87,7 +87,7 @@ ${t.status === 'waiting' ? `<table>
 ${ahead <= 3 ? '<div class="notice">اقترب دورك، توجّه إلى المكان الآن.</div>' : ''}` : ''}
 ${t.status === 'called' ? '<div class="notice">توجّه إلى الشباك فوراً.</div>' : ''}
 </div>
-${active ? `<p class="muted">الصفحة تتحدث تلقائياً كل 30 ثانية. احفظ هذا الرابط أو صوّر الشاشة.</p>
+${active ? `<p class="ok">دورك محفوظ.</p><p class="muted">آخر تحديث: ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit' })} · تتحدث الصفحة تلقائياً كل 30 ثانية. احفظ هذا الرابط أو صوّر الشاشة.</p>
 <div class="row"><a class="btn btn2" href="/t/${esc(t.token)}">تحديث الآن</a>
 ${t.status === 'waiting' ? action(`/t/${t.token}/cancel`, 'إلغاء دوري', 'warn') : ''}</div>` : `<a class="btn" href="/s/${esc(q.code)}">احجز دوراً جديداً</a>`}`,
   { refresh: active ? 30 : 0 });
@@ -335,7 +335,12 @@ async function handle(req, res) {
       if (m[2] === 'skip') core.skipCurrent(q);
       if (m[2] === 'walkin') msg = `تذكرة جديدة: رقم ${issueTicket(q).number} — اكتبه للشخص على ورقة.`;
       if (m[2] === 'toggle') core.toggleQueue(q);
-      if (m[2] === 'reset') core.resetQueue(q);
+      if (m[2] === 'reset') {
+        if (body.confirm !== '1') return send(req, res, 200, page('تأكيد التصفير', `<h1>تصفير طابور «${esc(q.name)}»؟</h1>
+<div class="notice">سيتم إلغاء كل التذاكر المنتظرة ويبدأ الترقيم من 1. لا يمكن التراجع.</div>
+<div class="row">${action(`/dash/queue/${q.id}/reset`, 'نعم، صفّر الطابور', 'warn', { confirm: 1 })}<a class="btn btn2" href="/dash">إلغاء</a></div>`));
+        core.resetQueue(q);
+      }
       return msg ? send(req, res, 200, dashPage(store, msg)) : redirect(res, '/dash');
     }
     if ((m = p.match(/^\/dash\/order\/(\d+)$/))) {
