@@ -43,7 +43,7 @@ const currentStore = (req) => core.storeBySession(cookies(req).sid);
 function homePage(err = '') {
   return page('الرئيسية', `
 <h1>دور — بدون طوابير</h1>
-<p>احجز دورك في طابور الخبز، تعبئة المياه، الحلاق، أو اطلب طلبك مسبقاً واستلمه جاهزاً.</p>
+<p>احجز دورك في طابور الخبز أو المياه أو الحلاق، أو اطلب مسبقاً واستلم طلبك جاهزاً.</p>
 ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 <div class="card"><form method="get" action="/find">
 <label for="c">رمز المحل أو النقطة</label>
@@ -52,7 +52,7 @@ ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 <div class="card"><h2>أصحاب المحلات والنقاط</h2>
 <p class="muted">مخبز، نقطة مياه، صالون، مطعم، مقهى، أو أي نقطة توزيع.</p>
 <div class="row"><a class="btn" href="/login">دخول</a><a class="btn btn2" href="/register">تسجيل محل جديد</a></div></div>
-<p class="muted">الصفحات خفيفة جداً وتعمل على الإنترنت الضعيف. احفظ رابط تذكرتك لتعود إليه.</p>`);
+<p class="muted">الصفحات خفيفة وتعمل مع الإنترنت الضعيف. احفظ رابط تذكرتك لترجع إليه.</p>`);
 }
 
 function storePage(store, err = '') {
@@ -65,7 +65,7 @@ ${q.is_open ? `<form method="post" action="/s/${esc(store.code)}/join"><input ty
 <label for="n${q.id}">الاسم (اختياري)</label><input id="n${q.id}" name="name" maxlength="40" autocomplete="name">
 <label for="p${q.id}">رقم الجوال (اختياري)</label><input id="p${q.id}" name="phone" maxlength="20" inputmode="tel" autocomplete="tel" dir="ltr">
 <button class="big">احجز دوري</button></form>` : ''}</div>`;
-  }).join('') || '<p class="muted">لا توجد طوابير مفتوحة حالياً.</p>';
+  }).join('') || '<p class="muted">لا توجد طوابير مفتوحة الآن. جرّب لاحقاً.</p>';
   return page(store.name, `<h1>${esc(store.name)}</h1><p class="muted">${esc(store.area)} · الرمز: <b>${esc(store.code)}</b></p>
 ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 ${store.orders_enabled ? `<a class="btn big" href="/s/${esc(store.code)}/order">🛍️ اطلب مسبقاً واستلم جاهزاً</a>` : ''}
@@ -86,7 +86,7 @@ ${t.status === 'waiting' ? `<table>
 <tr><td>أمامك</td><td><b>${ahead}</b> شخص</td></tr>
 <tr><td>الانتظار المتوقع</td><td><b>${mins(ahead * q.avg_minutes)}</b></td></tr></table>
 ${ahead <= 3 ? '<div class="notice">اقترب دورك، توجّه إلى المكان الآن.</div>' : ''}` : ''}
-${t.status === 'called' ? '<div class="notice">توجّه إلى الشباك فوراً.</div>' : ''}
+${t.status === 'called' ? '<div class="notice">توجّه إلى الشباك الآن.</div>' : ''}
 </div>
 ${active ? `<p class="ok">دورك محفوظ.</p><p class="muted">آخر تحديث: ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit' })} · تتحدث الصفحة تلقائياً كل 30 ثانية. احفظ هذا الرابط أو صوّر الشاشة.</p>
 <div class="row"><a class="btn btn2" href="/t/${esc(t.token)}">تحديث الآن</a>
@@ -112,7 +112,7 @@ ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 <form method="post" class="card" action="/s/${esc(store.code)}/order">
 ${items.length ? `<table><tr><th>الصنف</th><th>السعر</th><th>الكمية</th></tr>
 ${items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.price)}</td><td><input name="qty_${i.id}" aria-label="كمية ${esc(i.name)}" type="number" min="0" max="50" value="0" inputmode="numeric" style="width:5em"></td></tr>`).join('')}</table>`
-  : '<p class="muted">لا توجد قائمة، اكتب طلبك في الملاحظات.</p>'}
+  : '<p class="muted">لا توجد قائمة. اكتب طلبك في الملاحظات.</p>'}
 <label for="note">ملاحظات / تفاصيل الطلب</label><textarea id="note" name="note" maxlength="300" rows="2"></textarea>
 <label for="name">الاسم</label><input id="name" name="name" required maxlength="40" autocomplete="name">
 <label for="phone">رقم الجوال (اختياري)</label><input id="phone" name="phone" maxlength="20" inputmode="tel" autocomplete="tel" dir="ltr">
@@ -143,7 +143,7 @@ ${reg ? `<label for="sn">اسم المحل أو النقطة</label><input id="s
 <label for="u">اسم المستخدم</label><input id="u" name="username" required maxlength="30" autocomplete="username" dir="ltr">
 <label for="pw">كلمة المرور</label><input id="pw" name="password" type="password" required minlength="${reg ? 6 : 1}" autocomplete="${reg ? 'new-password' : 'current-password'}" dir="ltr">
 <button class="big">${reg ? 'تسجيل' : 'دخول'}</button></form>
-<p>${reg ? '<a href="/login">لديك حساب؟ ادخل</a>' : '<a href="/register">تسجيل محل جديد</a>'}</p>`);
+<p>${reg ? '<a href="/login">عندك حساب؟ ادخل</a>' : '<a href="/register">تسجيل محل جديد</a>'}</p>`);
 }
 
 function dashPage(store, msg = '') {
@@ -159,10 +159,10 @@ function dashPage(store, msg = '') {
 <p style="text-align:center">${serving?.name ? esc(serving.name) + ' · ' : ''}المنتظرون: <b>${waitingCount(q)}</b> · متوسط الخدمة: ${mins(q.avg_minutes)}</p>
 ${next.length ? `<p class="muted">التالي: ${next.map((t) => t.number + (t.name ? ` (${esc(t.name)})` : '')).join('، ')}</p>` : ''}
 ${action(b + '/next', '▶ نادِ التالي', 'big')}
-<div class="row">${action(b + '/skip', 'تخطي الحالي (لم يحضر)', 'btn2')}
-${action(b + '/walkin', '+ تذكرة لشخص بدون جوال', 'btn2')}
+<div class="row">${action(b + '/skip', 'تخطّي الحالي (غير موجود)', 'btn2')}
+${action(b + '/walkin', '+ تذكرة ورقية لمن لا يملك جوالاً', 'btn2')}
 ${action(b + '/toggle', q.is_open ? 'إغلاق الحجز' : 'فتح الحجز', 'btn2')}
-${action(b + '/reset', 'تصفير الطابور (يوم جديد)', 'warn')}</div></div>`;
+${action(b + '/reset', 'يوم جديد (تصفير الطابور)', 'warn')}</div></div>`;
   }).join('');
   const oHtml = orders.map((o) => {
     const items = JSON.parse(o.items).map((i) => `${esc(i.name)}×${i.qty}`).join('، ');
@@ -185,7 +185,7 @@ ${qHtml}
 <button>إضافة</button></form>
 <div class="card"><h2>الطلبات المسبقة</h2>
 ${action('/dash/settings', store.orders_enabled ? 'إيقاف الطلب المسبق' : 'تفعيل الطلب المسبق', 'btn2', { orders: store.orders_enabled ? 0 : 1 })}
-${store.orders_enabled ? (orders.length ? `<table><tr><th>#</th><th>الزبون</th><th>الطلب</th><th>الحالة</th><th></th></tr>${oHtml}</table>` : '<p class="muted">لا توجد طلبات حالياً.</p>') : ''}</div>
+${store.orders_enabled ? (orders.length ? `<table><tr><th>#</th><th>الزبون</th><th>الطلب</th><th>الحالة</th><th></th></tr>${oHtml}</table>` : '<p class="muted">لا توجد طلبات الآن.</p>') : ''}</div>
 ${store.orders_enabled ? `<div class="card"><h2>القائمة</h2><table>${menu.map((m) => `<tr><td>${esc(m.name)}</td><td>${esc(m.price)}</td>
 <td><div class="row">${action(`/dash/menu/${m.id}/toggle`, m.available ? 'متوفر' : 'غير متوفر', 'btn2')}${action(`/dash/menu/${m.id}/delete`, 'حذف', 'warn')}</div></td></tr>`).join('')}</table>
 <form method="post" action="/dash/menu"><label for="mn">صنف جديد</label><input id="mn" name="name" required maxlength="50">
@@ -228,7 +228,7 @@ ${qr.svg(url, { label: `رمز QR لصفحة الحجز: ${url}` }).replace('<sv
 </div>`, { css: POSTER_CSS });
 }
 
-const notFound = (req, res) => send(req, res, 404, page('غير موجود', '<h1>الصفحة غير موجودة</h1><a class="btn" href="/">الرئيسية</a>'));
+const notFound = (req, res) => send(req, res, 404, page('غير موجود', '<h1>لم نجد هذه الصفحة</h1><a class="btn" href="/">الرئيسية</a>'));
 
 // ---------- router ----------
 async function handle(req, res) {
@@ -242,7 +242,7 @@ async function handle(req, res) {
   let originHost = null;
   try { if (origin && origin !== 'null') originHost = new URL(origin).host; } catch {}
   if (post && originHost && req.headers.host && originHost !== req.headers.host) {
-    return send(req, res, 403, page('مرفوض', '<p>طلب مرفوض.</p>'));
+    return send(req, res, 403, page('مرفوض', '<p>تعذّر إكمال الطلب. ارجع للصفحة السابقة وجرّب مرة ثانية.</p>'));
   }
   const body = post ? await readBody(req) : {};
   let m;
@@ -256,7 +256,7 @@ async function handle(req, res) {
   if (p === '/find') {
     const code = clip(url.searchParams.get('code'), 12).toLowerCase();
     const s = db.prepare('SELECT code FROM stores WHERE code = ?').get(code);
-    return s ? redirect(res, `/s/${s.code}`) : send(req, res, 404, homePage('لم نجد محلاً بهذا الرمز.'));
+    return s ? redirect(res, `/s/${s.code}`) : send(req, res, 404, homePage('لم نجد محلاً بهذا الرمز. تأكد من الرمز وجرّب مرة ثانية.'));
   }
 
   // ----- public store pages -----
@@ -268,14 +268,14 @@ async function handle(req, res) {
     if (sub === '/screen') return send(req, res, 200, screenPage(store));
     if (sub === '/poster' && !post) return send(req, res, 200, posterPage(store, baseUrl(req)));
     if (sub === '/join' && post) {
-      if (core.isLimited(ip, 'join')) return send(req, res, 429, storePage(store, 'حجوزات كثيرة من هذا الجهاز، حاول لاحقاً.'));
+      if (core.isLimited(ip, 'join')) return send(req, res, 429, storePage(store, 'حجوزات كثيرة من هذا الجهاز. انتظر دقيقة وجرّب مرة ثانية.'));
       const t = core.joinQueue(store, body.queue_id, body.name, body.phone);
-      if (t.error) return send(req, res, 400, storePage(store, 'هذا الطابور مغلق.'));
+      if (t.error) return send(req, res, 400, storePage(store, 'الحجز في هذا الطابور مغلق الآن. جرّب لاحقاً.'));
       return redirect(res, `/t/${t.token}`);
     }
     if (sub === '/order' && store.orders_enabled) {
       if (!post) return send(req, res, 200, orderFormPage(store));
-      if (core.isLimited(ip, 'order')) return send(req, res, 429, orderFormPage(store, 'طلبات كثيرة، حاول لاحقاً.'));
+      if (core.isLimited(ip, 'order')) return send(req, res, 429, orderFormPage(store, 'طلبات كثيرة من هذا الجهاز. انتظر دقيقة وجرّب مرة ثانية.'));
       const o = core.placeOrder(store, { qtyOf: (i) => body['qty_' + i.id], note: body.note, name: body.name, phone: body.phone, pickup: body.pickup });
       if (o.error) return send(req, res, 400, orderFormPage(store, 'اكتب اسمك واختر صنفاً واحداً على الأقل.'));
       const token = o.token;
@@ -302,7 +302,7 @@ async function handle(req, res) {
   if (p === '/login' || p === '/register') {
     const kind = p.slice(1);
     if (!post) return send(req, res, 200, authPage(kind));
-    if (core.isLimited(ip, 'auth')) return send(req, res, 429, authPage(kind, 'محاولات كثيرة، انتظر قليلاً.'));
+    if (core.isLimited(ip, 'auth')) return send(req, res, 429, authPage(kind, 'محاولات كثيرة. انتظر دقيقة وجرّب مرة ثانية.'));
     let store;
     if (kind === 'register') {
       const r = core.registerStore(body);
@@ -310,7 +310,7 @@ async function handle(req, res) {
       store = r.store;
     } else {
       store = core.loginStore(body.username, body.password);
-      if (!store) return send(req, res, 401, authPage(kind, 'اسم المستخدم أو كلمة المرور غير صحيحة.'));
+      if (!store) return send(req, res, 401, authPage(kind, 'اسم المستخدم أو كلمة المرور غير صحيحة. جرّب مرة ثانية.'));
     }
     const sid = core.createSession(store).token;
     const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
@@ -342,7 +342,7 @@ async function handle(req, res) {
       if (m[2] === 'toggle') core.toggleQueue(q);
       if (m[2] === 'reset') {
         if (body.confirm !== '1') return send(req, res, 200, page('تأكيد التصفير', `<h1>تصفير طابور «${esc(q.name)}»؟</h1>
-<div class="notice">سيتم إلغاء كل التذاكر المنتظرة ويبدأ الترقيم من 1. لا يمكن التراجع.</div>
+<div class="notice">سيتم إلغاء كل الأدوار المنتظرة ويبدأ الترقيم من 1. لا يمكن التراجع.</div>
 <div class="row">${action(`/dash/queue/${q.id}/reset`, 'نعم، صفّر الطابور', 'warn', { confirm: 1 })}<a class="btn btn2" href="/dash">إلغاء</a></div>`));
         core.resetQueue(q);
       }
@@ -371,7 +371,7 @@ async function handle(req, res) {
 const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => {
     console.error(e);
-    if (!res.headersSent) send(req, res, 500, page('خطأ', '<p>حدث خطأ، حاول مرة أخرى.</p>'));
+    if (!res.headersSent) send(req, res, 500, page('خطأ', '<p>تعذّر إكمال طلبك. جرّب مرة ثانية.</p>'));
   });
 });
 

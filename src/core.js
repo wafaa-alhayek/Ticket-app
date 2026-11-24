@@ -9,8 +9,8 @@ const clip = (s, n) => String(s ?? '').trim().slice(0, n);
 const SESSION_DAYS = 30;
 const PURGE_DAYS = 7;
 
-const STATUS_AR = { waiting: 'في الانتظار', called: 'حان دورك!', done: 'تمّت الخدمة', skipped: 'فاتك الدور', cancelled: 'أُلغيت' };
-const ORDER_AR = { new: 'تم الاستلام', preparing: 'قيد التحضير', ready: 'جاهز للاستلام ✅', picked: 'تم الاستلام من المحل', cancelled: 'أُلغي' };
+const STATUS_AR = { waiting: 'في الانتظار', called: 'حان دورك!', done: 'تمّت خدمتك، شكراً لك', skipped: 'مرّ دورك — كلّم المسؤول عن الطابور', cancelled: 'أُلغي دورك' };
+const ORDER_AR = { new: 'وصلنا الطلب', preparing: 'قيد التحضير', ready: 'جاهز للاستلام ✅', picked: 'تم التسليم', cancelled: 'أُلغي الطلب' };
 const ORDER_STATUSES = ['preparing', 'ready', 'picked', 'cancelled'];
 
 // ---------- passwords ----------
@@ -152,9 +152,9 @@ const deleteMenuItem = (store, id) =>
 // Returns { error, message_ar } or { store }.
 function registerStore({ name, area, username, password }) {
   username = clip(username, 30).toLowerCase(); password = String(password || ''); name = clip(name, 60);
-  if (!/^[a-z0-9_.-]{3,30}$/.test(username)) return { error: 'invalid_input', message_ar: 'اسم المستخدم: 3 أحرف إنجليزية أو أرقام على الأقل.' };
-  if (password.length < 6 || !name) return { error: 'invalid_input', message_ar: 'أكمل البيانات (كلمة المرور 6 أحرف على الأقل).' };
-  if (db.prepare('SELECT 1 FROM stores WHERE username = ?').get(username)) return { error: 'username_taken', message_ar: 'اسم المستخدم مستخدم مسبقاً.' };
+  if (!/^[a-z0-9_.-]{3,30}$/.test(username)) return { error: 'invalid_input', message_ar: 'اسم المستخدم: 3 أحرف على الأقل، بالإنجليزية أو أرقام.' };
+  if (password.length < 6 || !name) return { error: 'invalid_input', message_ar: 'اكتب اسم المحل، وكلمة مرور من 6 أحرف على الأقل.' };
+  if (db.prepare('SELECT 1 FROM stores WHERE username = ?').get(username)) return { error: 'username_taken', message_ar: 'اسم المستخدم محجوز. اختر اسماً آخر.' };
   let code; do { code = crypto.randomBytes(3).toString('hex').slice(0, 4); } while (db.prepare('SELECT 1 FROM stores WHERE code = ?').get(code));
   const r = db.prepare('INSERT INTO stores (code, name, area, username, pass_hash, created_at) VALUES (?,?,?,?,?,?)')
     .run(code, name, clip(area, 60), username, hashPass(password), now());
