@@ -40,3 +40,10 @@ Dor is a zero-dependency Node.js queue-ticket and pre-order app, Arabic-first (R
 - SMS notification when your turn is near (local gateway)
 - Offline-first PWA cache for the ticket page
 - Admin view for aid organizations coordinating many distribution points
+
+## QR code and poster
+`src/qr.js` is a dependency-free QR encoder (byte mode, error correction M, versions 1–10, all 8 masks with penalty scoring) that outputs a single-`<path>` SVG. Store owners print `/s/<code>/poster` (linked from the dashboard): an A4 page with the store name, code, a QR to the booking page, and three steps.
+
+`test/qr.test.js` checks structure (finders, timing, format and version info). The output was also checked with a real decoder: SVGs for every version 1–10 and every mask were rendered to PNG with headless Chrome and decoded with `zxing-cpp` (`pip install zxing-cpp pillow`); all decoded to the original text at level M.
+
+`test/budget.test.js` fills a store with realistic data and checks that every page type is ≤ 15 KB gzipped.

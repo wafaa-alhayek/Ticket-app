@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node --no-warnings src/server.js",
-    "test": "DB_FILE=:memory: node --no-warnings --test test/flow.test.js test/api.test.js"
+    "test": "DB_FILE=:memory: node --no-warnings --test test/flow.test.js test/api.test.js test/qr.test.js test/budget.test.js"
   },
   "engines": { "node": ">=22.5" },
   "license": "MIT"

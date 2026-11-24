@@ -4,6 +4,7 @@ const http = require('node:http');
 const zlib = require('node:zlib');
 const db = require('./db');
 const { esc, page, action, mins } = require('./html');
+const qr = require('./qr');
 
 const PORT = Number(process.env.PORT || 3000);
 const core = require('./core');
@@ -60,8 +61,8 @@ function storePage(store, err = '') {
     return `<div class="card"><h2>${esc(q.name)} ${q.is_open ? '' : '<span class="bad">(مغلق)</span>'}</h2>
 <div class="row"><span>الدور الحالي: <b>${q.current_number || '—'}</b></span> · <span>المنتظرون: <b>${w}</b></span> · <span>الانتظار المتوقع: <b>${mins(w * q.avg_minutes)}</b></span></div>
 ${q.is_open ? `<form method="post" action="/s/${esc(store.code)}/join"><input type="hidden" name="queue_id" value="${q.id}">
-<label>الاسم (اختياري)</label><input name="name" maxlength="40">
-<label>رقم الجوال (اختياري)</label><input name="phone" maxlength="20" inputmode="tel">
+<label for="n${q.id}">الاسم (اختياري)</label><input id="n${q.id}" name="name" maxlength="40" autocomplete="name">
+<label for="p${q.id}">رقم الجوال (اختياري)</label><input id="p${q.id}" name="phone" maxlength="20" inputmode="tel" autocomplete="tel" dir="ltr">
 <button class="big">احجز دوري</button></form>` : ''}</div>`;
   }).join('') || '<p class="muted">لا توجد طوابير مفتوحة حالياً.</p>';
   return page(store.name, `<h1>${esc(store.name)}</h1><p class="muted">${esc(store.area)} · الرمز: <b>${esc(store.code)}</b></p>
@@ -75,7 +76,7 @@ function ticketPage(t) {
   const ahead = t.status === 'waiting' ? waitingAhead(q, t.number) : 0;
   const active = t.status === 'waiting' || t.status === 'called';
   return page(`تذكرة ${t.number}`, `
-<div class="card ${t.status === 'called' ? 'called' : ''}">
+<div class="card ${t.status === 'called' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(q.sname)} — ${esc(q.name)}</p>
 <p class="muted">رقمك</p><div class="num">${t.number}</div>
 <h2 style="text-align:center">${STATUS_AR[t.status]}</h2>
@@ -109,12 +110,12 @@ function orderFormPage(store, err = '') {
 ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 <form method="post" class="card" action="/s/${esc(store.code)}/order">
 ${items.length ? `<table><tr><th>الصنف</th><th>السعر</th><th>الكمية</th></tr>
-${items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.price)}</td><td><input name="qty_${i.id}" type="number" min="0" max="50" value="0" inputmode="numeric" style="width:5em"></td></tr>`).join('')}</table>`
+${items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.price)}</td><td><input name="qty_${i.id}" aria-label="كمية ${esc(i.name)}" type="number" min="0" max="50" value="0" inputmode="numeric" style="width:5em"></td></tr>`).join('')}</table>`
   : '<p class="muted">لا توجد قائمة، اكتب طلبك في الملاحظات.</p>'}
-<label>ملاحظات / تفاصيل الطلب</label><textarea name="note" maxlength="300" rows="2"></textarea>
-<label>الاسم</label><input name="name" required maxlength="40">
-<label>رقم الجوال (اختياري)</label><input name="phone" maxlength="20" inputmode="tel">
-<label>متى ستصل؟</label><select name="pickup"><option>في أقرب وقت</option><option>خلال 15 دقيقة</option><option>خلال 30 دقيقة</option><option>خلال ساعة</option></select>
+<label for="note">ملاحظات / تفاصيل الطلب</label><textarea id="note" name="note" maxlength="300" rows="2"></textarea>
+<label for="name">الاسم</label><input id="name" name="name" required maxlength="40" autocomplete="name">
+<label for="phone">رقم الجوال (اختياري)</label><input id="phone" name="phone" maxlength="20" inputmode="tel" autocomplete="tel" dir="ltr">
+<label for="pickup">متى ستصل؟</label><select id="pickup" name="pickup"><option>في أقرب وقت</option><option>خلال 15 دقيقة</option><option>خلال 30 دقيقة</option><option>خلال ساعة</option></select>
 <button class="big">أرسل الطلب</button></form>`);
 }
 
@@ -122,7 +123,7 @@ function orderPage(o) {
   const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(o.store_id);
   const items = JSON.parse(o.items);
   const active = ['new', 'preparing', 'ready'].includes(o.status);
-  return page(`طلب ${o.number}`, `<div class="card ${o.status === 'ready' ? 'called' : ''}">
+  return page(`طلب ${o.number}`, `<div class="card ${o.status === 'ready' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(store.name)}</p><p class="muted">رقم طلبك</p><div class="num">${o.number}</div>
 <h2 style="text-align:center">${ORDER_AR[o.status]}</h2>
 <ul>${items.map((i) => `<li>${esc(i.name)} × ${i.qty}</li>`).join('')}</ul>
@@ -136,10 +137,10 @@ function authPage(kind, err = '') {
   return page(reg ? 'تسجيل محل' : 'دخول', `<h1>${reg ? 'تسجيل محل / نقطة جديدة' : 'دخول أصحاب المحلات'}</h1>
 ${err ? `<div class="notice">${esc(err)}</div>` : ''}
 <form method="post" class="card" action="/${kind}">
-${reg ? `<label>اسم المحل أو النقطة</label><input name="name" required maxlength="60" placeholder="مثال: مخبز العائلات">
-<label>المنطقة</label><input name="area" maxlength="60" placeholder="مثال: دير البلح - السوق">` : ''}
-<label>اسم المستخدم</label><input name="username" required maxlength="30" autocomplete="username" dir="ltr">
-<label>كلمة المرور</label><input name="password" type="password" required minlength="${reg ? 6 : 1}" autocomplete="${reg ? 'new-password' : 'current-password'}" dir="ltr">
+${reg ? `<label for="sn">اسم المحل أو النقطة</label><input id="sn" name="name" required maxlength="60" placeholder="مثال: مخبز العائلات">
+<label for="area">المنطقة</label><input id="area" name="area" maxlength="60" placeholder="مثال: دير البلح - السوق">` : ''}
+<label for="u">اسم المستخدم</label><input id="u" name="username" required maxlength="30" autocomplete="username" dir="ltr">
+<label for="pw">كلمة المرور</label><input id="pw" name="password" type="password" required minlength="${reg ? 6 : 1}" autocomplete="${reg ? 'new-password' : 'current-password'}" dir="ltr">
 <button class="big">${reg ? 'تسجيل' : 'دخول'}</button></form>
 <p>${reg ? '<a href="/login">لديك حساب؟ ادخل</a>' : '<a href="/register">تسجيل محل جديد</a>'}</p>`);
 }
@@ -175,20 +176,55 @@ ${action(b, 'إلغاء', 'btn2', { status: 'cancelled' })}</div></td></tr>`;
 ${msg ? `<div class="notice">${esc(msg)}</div>` : ''}
 <div class="card"><p>رمز محلك للزبائن: <b style="font-size:1.4em">${esc(store.code)}</b></p>
 <p class="muted">صفحة الحجز: <a href="/s/${esc(store.code)}" dir="ltr">/s/${esc(store.code)}</a> · شاشة العرض: <a href="/s/${esc(store.code)}/screen" dir="ltr">/s/${esc(store.code)}/screen</a></p>
-<p><a class="btn btn2" href="/dash">تحديث</a></p></div>
+<div class="row"><a class="btn" href="/s/${esc(store.code)}/poster">🖨️ ملصق QR للطباعة</a><a class="btn btn2" href="/dash">تحديث</a></div></div>
 ${qHtml}
 <form method="post" class="card" action="/dash/queue"><h2>إضافة طابور</h2>
-<label>اسم الطابور</label><input name="name" required maxlength="40" placeholder="مثال: خبز، مياه، حلاقة">
-<label>مدة خدمة الشخص تقريباً (دقائق)</label><input name="avg" type="number" min="0.2" max="120" step="0.1" value="3" inputmode="decimal">
+<label for="qn">اسم الطابور</label><input id="qn" name="name" required maxlength="40" placeholder="مثال: خبز، مياه، حلاقة">
+<label for="qa">مدة خدمة الشخص تقريباً (دقائق)</label><input id="qa" name="avg" type="number" min="0.2" max="120" step="0.1" value="3" inputmode="decimal">
 <button>إضافة</button></form>
 <div class="card"><h2>الطلبات المسبقة</h2>
 ${action('/dash/settings', store.orders_enabled ? 'إيقاف الطلب المسبق' : 'تفعيل الطلب المسبق', 'btn2', { orders: store.orders_enabled ? 0 : 1 })}
 ${store.orders_enabled ? (orders.length ? `<table><tr><th>#</th><th>الزبون</th><th>الطلب</th><th>الحالة</th><th></th></tr>${oHtml}</table>` : '<p class="muted">لا توجد طلبات حالياً.</p>') : ''}</div>
 ${store.orders_enabled ? `<div class="card"><h2>القائمة</h2><table>${menu.map((m) => `<tr><td>${esc(m.name)}</td><td>${esc(m.price)}</td>
 <td><div class="row">${action(`/dash/menu/${m.id}/toggle`, m.available ? 'متوفر' : 'غير متوفر', 'btn2')}${action(`/dash/menu/${m.id}/delete`, 'حذف', 'warn')}</div></td></tr>`).join('')}</table>
-<form method="post" action="/dash/menu"><label>صنف جديد</label><input name="name" required maxlength="50">
-<label>السعر (اختياري)</label><input name="price" maxlength="20"><button>إضافة صنف</button></form></div>` : ''}
+<form method="post" action="/dash/menu"><label for="mn">صنف جديد</label><input id="mn" name="name" required maxlength="50">
+<label for="mp">السعر (اختياري)</label><input id="mp" name="price" maxlength="20"><button>إضافة صنف</button></form></div>` : ''}
 ${action('/logout', 'تسجيل الخروج', 'btn2')}`, { nav: '<a href="/dash">اللوحة</a>' });
+}
+
+// Public base URL for links printed on paper (poster QR). Behind a proxy, trust x-forwarded-proto.
+function baseUrl(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' ? 'https' : 'http';
+  const host = String(req.headers.host || '');
+  return `${proto}://${/^[a-z0-9.\-]+(:\d+)?$|^\[[0-9a-f:.]+\](:\d+)?$/i.test(host) ? host : 'localhost'}`;
+}
+
+const POSTER_CSS = `
+.poster{max-width:180mm;margin:0 auto;text-align:center;padding:12px}
+.poster h1{font-size:2.2em;color:#14532d;margin:.2em 0}
+.poster .qr{width:min(100%,110mm);height:auto;display:block;margin:12px auto;border:6px solid #14532d;border-radius:12px}
+.poster .code{font-size:2.4em;font-weight:bold;letter-spacing:.15em;direction:ltr;unicode-bidi:isolate}
+.poster ol{text-align:right;font-size:1.3em;max-width:150mm;margin:12px auto;padding-right:1.4em}
+.poster .url{direction:ltr;unicode-bidi:isolate;white-space:nowrap}.poster p.url{white-space:normal;word-break:break-all}
+.paper{border:3px dashed #9a3412;border-radius:10px;padding:10px;font-size:1.25em;font-weight:bold;color:#7c2d12}
+@page{size:A4;margin:12mm}
+@media print{body{background:#fff;font-size:14pt;line-height:1.4}.poster .qr{width:95mm;margin:6mm auto}.poster h1{font-size:28pt}.poster ol{font-size:15pt}header,.noprint{display:none}main{max-width:none;padding:0}.poster{padding:0}a{color:#000;text-decoration:none}}
+`;
+
+function posterPage(store, base) {
+  const url = `${base}/s/${store.code}`;
+  return page(`ملصق ${store.name}`, `<div class="poster">
+<p class="muted">احجز دورك بدون طابور مع <b>دور</b></p>
+<h1>${esc(store.name)}</h1>${store.area ? `<p>${esc(store.area)}</p>` : ''}
+${qr.svg(url, { label: `رمز QR لصفحة الحجز: ${url}` }).replace('<svg ', '<svg class="qr" ')}
+<p>رمز المحل</p><div class="code">${esc(store.code)}</div>
+<ol><li>صوّر الرمز بكاميرا جوالك، أو افتح <span class="url">${esc(base.replace(/^https?:\/\//, ''))}</span> واكتب الرمز <b>${esc(store.code)}</b>.</li>
+<li>اختر الطابور واضغط «احجز دوري».</li>
+<li>احفظ صفحة تذكرتك وارجع عندما يقترب دورك.</li></ol>
+<p class="paper">ما عندك جوال؟ اطلب رقماً ورقياً من الشباك.</p>
+<p class="url muted">${esc(url)}</p>
+<p class="noprint"><a class="btn" href="/dash">رجوع للوحة</a> <span class="muted">اطبع هذه الصفحة من قائمة المتصفح (طباعة).</span></p>
+</div>`, { css: POSTER_CSS });
 }
 
 const notFound = (req, res) => send(req, res, 404, page('غير موجود', '<h1>الصفحة غير موجودة</h1><a class="btn" href="/">الرئيسية</a>'));
@@ -225,6 +261,7 @@ async function handle(req, res) {
     const sub = m[2] || '';
     if (sub === '' && !post) return send(req, res, 200, storePage(store));
     if (sub === '/screen') return send(req, res, 200, screenPage(store));
+    if (sub === '/poster' && !post) return send(req, res, 200, posterPage(store, baseUrl(req)));
     if (sub === '/join' && post) {
       if (core.isLimited(ip, 'join')) return send(req, res, 429, storePage(store, 'حجوزات كثيرة من هذا الجهاز، حاول لاحقاً.'));
       const t = core.joinQueue(store, body.queue_id, body.name, body.phone);
