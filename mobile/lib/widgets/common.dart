@@ -15,7 +15,12 @@ class BigNumber extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // Read as one phrase ("رقمك 53"), not two unrelated nodes.
+    return Semantics(
+      container: true,
+      label: '$label ${value > 0 ? value : '—'}',
+      excludeSemantics: true,
+      child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: highlight ? kAccent : Colors.white,
@@ -33,7 +38,7 @@ class BigNumber extends StatelessWidget {
                   color: kGreen)),
         ),
       ]),
-    );
+    ));
   }
 }
 
@@ -41,7 +46,9 @@ class ErrorBanner extends StatelessWidget {
   final String text;
   const ErrorBanner(this.text, {super.key});
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Semantics(
+      liveRegion: true,
+      child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -49,7 +56,7 @@ class ErrorBanner extends StatelessWidget {
             color: const Color(0xFFFEE2E2),
             borderRadius: BorderRadius.circular(8)),
         child: Text(text, style: const TextStyle(color: Color(0xFF991B1B))),
-      );
+      ));
 }
 
 void showSnack(BuildContext context, String msg) =>

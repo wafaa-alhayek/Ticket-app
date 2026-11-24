@@ -82,7 +82,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
           if (_at != null)
             Text('${S.lastUpdate}: ${hhmm(_at!)}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54)),
+                style: const TextStyle(color: Color(0xFF5C5648))),
           if (o.active)
             ElevatedButton(onPressed: _poll, child: const Text(S.refresh)),
         ],

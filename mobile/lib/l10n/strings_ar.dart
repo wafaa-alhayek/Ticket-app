@@ -50,6 +50,10 @@ class S {
   static const queueName = 'اسم الطابور';
   static const serviceMinutes = 'دقائق الخدمة لكل شخص';
   static const add = 'إضافة';
+  static const increase = 'زيادة كمية';
+  static const decrease = 'إنقاص كمية';
+  static const delete = 'حذف';
+  static const available = 'متوفر';
   static const orders = 'الطلبات';
   static const noOrders = 'لا توجد طلبات حالياً';
   static const prepare = 'تحضير';
