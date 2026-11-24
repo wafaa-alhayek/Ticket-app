@@ -11,6 +11,7 @@ ThemeData buildTheme() {
     secondary: kAccent,
   );
   return ThemeData(
+    fontFamily: 'ReadexPro',
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: kBg,

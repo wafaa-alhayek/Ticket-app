@@ -9,7 +9,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
 const FAVICON = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"%3E%3Crect width="16" height="16" rx="3" fill="#14532d"/%3E%3Cpath fill="#facc15" d="M2 4h12v2.6a1.4 1.4 0 0 0 0 2.8V12H2V9.4a1.4 1.4 0 0 0 0-2.8z"/%3E%3Cpath fill="#14532d" d="M10 5.3h1v1h-1zm0 2.2h1v1h-1zm0 2.2h1v1h-1zM4 6.6h4.5v1.3H4zm1.5 2H8.5v1.2h-3z"/%3E%3C/svg%3E';
 const CSS = `
 *{box-sizing:border-box}
-body{margin:0;font-family:Tahoma,"Segoe UI","Noto Naskh Arabic",Arial,sans-serif;background:#f4f1ea;color:#1d1d1b;line-height:1.6;font-size:17px}
+@font-face{font-family:"Readex Pro";src:url(/font/readex-ar.woff2) format("woff2");font-weight:400 700;font-display:swap}
+body{margin:0;font-family:"Readex Pro",Tahoma,"Segoe UI","Noto Naskh Arabic",Arial,sans-serif;background:#f4f1ea;color:#1d1d1b;line-height:1.6;font-size:17px}
 header{background:#14532d;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 header a{color:#fff;text-decoration:none;font-weight:bold}
 main{max-width:720px;margin:0 auto;padding:16px}

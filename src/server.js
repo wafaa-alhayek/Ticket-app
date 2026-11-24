@@ -6,6 +6,7 @@ const db = require('./db');
 const { esc, page, action, mins } = require('./html');
 const qr = require('./qr');
 
+const FONT = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'assets', 'fonts', 'readex-ar.woff2'));
 const PORT = Number(process.env.PORT || 3000);
 const core = require('./core');
 const { now, clip, SESSION_DAYS, STATUS_AR, ORDER_AR, waitingAhead, waitingCount, callNext, issueTicket } = core;
@@ -27,7 +28,7 @@ function send(req, res, status, html, headers = {}) {
   let body = Buffer.from(html);
   const h = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin',
-    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'", ...headers };
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; form-action 'self'", ...headers };
   if (/\bgzip\b/.test(req.headers['accept-encoding'] || '') && body.length > 600) {
     body = zlib.gzipSync(body, { level: 9 }); h['Content-Encoding'] = 'gzip';
   }
@@ -247,6 +248,10 @@ async function handle(req, res) {
   let m;
 
   if (p === '/' && !post) return send(req, res, 200, homePage());
+  if (p === '/font/readex-ar.woff2') {
+    res.writeHead(200, { 'Content-Type': 'font/woff2', 'Cache-Control': 'public, max-age=31536000, immutable', 'Content-Length': FONT.length });
+    return res.end(FONT);
+  }
   if (p === '/health') { res.writeHead(200); return res.end('ok'); }
   if (p === '/find') {
     const code = clip(url.searchParams.get('code'), 12).toLowerCase();

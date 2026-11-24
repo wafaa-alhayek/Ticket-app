@@ -47,3 +47,9 @@ as a fill with dark outlines, and the "no phone" line is white on black.
 ## Regenerating
 The SVGs are hand-structured; wordmark path came from:
 `hb-shape` (uharfbuzz) + `fontTools` `SVGPathPen` on `/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf` (Bitstream Vera / DejaVu free licence).
+
+## Typeface (updated)
+The brand typeface is **Readex Pro** (SIL Open Font License, `assets/fonts/OFL.txt`).
+- Wordmark «دور» in the logo, icon and poster header: Readex Pro Bold, converted to outlines.
+- Website: `assets/fonts/readex-ar.woff2` (30 KB, Arabic + Latin + digits, weights 400–700), served at `/font/readex-ar.woff2` with a one-year cache and `font-display: swap`.
+- Flutter app: `mobile/assets/fonts/ReadexPro-Arabic.ttf`.
