@@ -1,36 +1,14 @@
 'use strict';
 // "دور" (Dor) — queue tickets & pickup orders. Zero dependencies, Node >= 22.5.
 const http = require('node:http');
-const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const db = require('./db');
 const { esc, page, action, mins } = require('./html');
 
 const PORT = Number(process.env.PORT || 3000);
-const now = () => Date.now();
-const rand = (n = 16) => crypto.randomBytes(n).toString('base64url');
-const SESSION_DAYS = 30;
-
-// ---------- passwords ----------
-function hashPass(p) {
-  const salt = crypto.randomBytes(16);
-  return salt.toString('hex') + ':' + crypto.scryptSync(p, salt, 32).toString('hex');
-}
-function checkPass(p, stored) {
-  const [salt, hash] = stored.split(':');
-  const h = crypto.scryptSync(p, Buffer.from(salt, 'hex'), 32);
-  return crypto.timingSafeEqual(h, Buffer.from(hash, 'hex'));
-}
-
-// ---------- tiny rate limiter (per IP, per bucket) ----------
-const hits = new Map();
-function limited(ip, bucket, max, windowMs) {
-  const key = bucket + ip, t = now();
-  const arr = (hits.get(key) || []).filter((x) => t - x < windowMs);
-  arr.push(t); hits.set(key, arr);
-  return arr.length > max;
-}
-setInterval(() => hits.clear(), 60 * 60 * 1000).unref();
+const core = require('./core');
+const { now, clip, SESSION_DAYS, STATUS_AR, ORDER_AR, waitingAhead, waitingCount, callNext, issueTicket } = core;
+const api = require('./api');
 
 // ---------- request helpers ----------
 function readBody(req) {
@@ -56,50 +34,8 @@ function send(req, res, status, html, headers = {}) {
   res.writeHead(status, h); res.end(body);
 }
 const redirect = (res, to, headers = {}) => { res.writeHead(303, { Location: to, ...headers }); res.end(); };
-const clip = (s, n) => String(s || '').trim().slice(0, n);
 
-function currentStore(req) {
-  const t = cookies(req).sid;
-  if (!t) return null;
-  return db.prepare(`SELECT s.* FROM sessions x JOIN stores s ON s.id = x.store_id
-    WHERE x.token = ? AND x.expires_at > ?`).get(t, now()) || null;
-}
-
-// ---------- queue logic ----------
-const waitingAhead = (q, number) => db.prepare(
-  `SELECT COUNT(*) c FROM tickets WHERE queue_id = ? AND status = 'waiting' AND number < ?`).get(q.id, number).c;
-const waitingCount = (q) => db.prepare(
-  `SELECT COUNT(*) c FROM tickets WHERE queue_id = ? AND status = 'waiting'`).get(q.id).c;
-
-function issueTicket(q, name = '', phone = '') {
-  const number = q.last_number + 1;
-  db.prepare('UPDATE queues SET last_number = ? WHERE id = ?').run(number, q.id);
-  const token = rand(12);
-  db.prepare(`INSERT INTO tickets (queue_id, number, token, name, phone, created_at) VALUES (?,?,?,?,?,?)`)
-    .run(q.id, number, token, name, phone, now());
-  return { number, token };
-}
-
-function callNext(q) {
-  // Close out whoever was being served, then call the next waiting ticket.
-  db.prepare(`UPDATE tickets SET status = 'done' WHERE queue_id = ? AND status = 'called'`).run(q.id);
-  const next = db.prepare(`SELECT * FROM tickets WHERE queue_id = ? AND status = 'waiting' ORDER BY number LIMIT 1`).get(q.id);
-  if (!next) return null;
-  const t = now();
-  // Learn the real service time (moving average), ignoring long pauses/breaks.
-  let avg = q.avg_minutes;
-  if (q.last_called_at) {
-    const gap = (t - q.last_called_at) / 60000;
-    if (gap > 0.05 && gap < 60) avg = avg * 0.8 + gap * 0.2;
-  }
-  db.prepare(`UPDATE tickets SET status = 'called', called_at = ? WHERE id = ?`).run(t, next.id);
-  db.prepare(`UPDATE queues SET current_number = ?, last_called_at = ?, avg_minutes = ? WHERE id = ?`)
-    .run(next.number, t, avg, q.id);
-  return next;
-}
-
-const STATUS_AR = { waiting: 'في الانتظار', called: 'حان دورك!', done: 'تمّت الخدمة', skipped: 'فاتك الدور', cancelled: 'أُلغيت' };
-const ORDER_AR = { new: 'تم الاستلام', preparing: 'قيد التحضير', ready: 'جاهز للاستلام ✅', picked: 'تم الاستلام من المحل', cancelled: 'أُلغي' };
+const currentStore = (req) => core.storeBySession(cookies(req).sid);
 
 // ---------- pages ----------
 function homePage(err = '') {
@@ -263,6 +199,7 @@ async function handle(req, res) {
   const p = url.pathname.replace(/\/+$/, '') || '/';
   const ip = req.socket.remoteAddress || '';
   const post = req.method === 'POST';
+  if (p.startsWith('/api/')) return api.handle(req, res, p, url, ip);
   // Basic CSRF defence: cross-site POSTs are refused (cookie is also SameSite=Lax).
   const origin = req.headers.origin;
   let originHost = null;
@@ -289,28 +226,17 @@ async function handle(req, res) {
     if (sub === '' && !post) return send(req, res, 200, storePage(store));
     if (sub === '/screen') return send(req, res, 200, screenPage(store));
     if (sub === '/join' && post) {
-      if (limited(ip, 'join', 20, 60 * 60 * 1000)) return send(req, res, 429, storePage(store, 'حجوزات كثيرة من هذا الجهاز، حاول لاحقاً.'));
-      const q = db.prepare('SELECT * FROM queues WHERE id = ? AND store_id = ?').get(Number(body.queue_id), store.id);
-      if (!q || !q.is_open) return send(req, res, 400, storePage(store, 'هذا الطابور مغلق.'));
-      const phone = clip(body.phone, 20).replace(/[^\d+]/g, '');
-      if (phone) { // one active ticket per phone per queue — keeps lines fair
-        const dup = db.prepare(`SELECT token FROM tickets WHERE queue_id = ? AND phone = ? AND status IN ('waiting','called')`).get(q.id, phone);
-        if (dup) return redirect(res, `/t/${dup.token}`);
-      }
-      const t = issueTicket(q, clip(body.name, 40), phone);
+      if (core.isLimited(ip, 'join')) return send(req, res, 429, storePage(store, 'حجوزات كثيرة من هذا الجهاز، حاول لاحقاً.'));
+      const t = core.joinQueue(store, body.queue_id, body.name, body.phone);
+      if (t.error) return send(req, res, 400, storePage(store, 'هذا الطابور مغلق.'));
       return redirect(res, `/t/${t.token}`);
     }
     if (sub === '/order' && store.orders_enabled) {
       if (!post) return send(req, res, 200, orderFormPage(store));
-      if (limited(ip, 'order', 10, 60 * 60 * 1000)) return send(req, res, 429, orderFormPage(store, 'طلبات كثيرة، حاول لاحقاً.'));
-      const menu = db.prepare('SELECT * FROM menu_items WHERE store_id = ? AND available = 1').all(store.id);
-      const items = menu.map((i) => ({ name: i.name, qty: Math.min(50, Math.max(0, parseInt(body['qty_' + i.id], 10) || 0)) })).filter((i) => i.qty > 0);
-      const note = clip(body.note, 300), name = clip(body.name, 40);
-      if (!name || (!items.length && !note)) return send(req, res, 400, orderFormPage(store, 'اكتب اسمك واختر صنفاً واحداً على الأقل.'));
-      const number = (db.prepare('SELECT MAX(number) n FROM orders WHERE store_id = ?').get(store.id).n || 0) + 1;
-      const token = rand(12);
-      db.prepare(`INSERT INTO orders (store_id, number, token, name, phone, items, note, pickup, created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-        .run(store.id, number, token, name, clip(body.phone, 20), JSON.stringify(items), note, clip(body.pickup, 30), now());
+      if (core.isLimited(ip, 'order')) return send(req, res, 429, orderFormPage(store, 'طلبات كثيرة، حاول لاحقاً.'));
+      const o = core.placeOrder(store, { qtyOf: (i) => body['qty_' + i.id], note: body.note, name: body.name, phone: body.phone, pickup: body.pickup });
+      if (o.error) return send(req, res, 400, orderFormPage(store, 'اكتب اسمك واختر صنفاً واحداً على الأقل.'));
+      const token = o.token;
       return redirect(res, `/o/${token}`);
     }
     return notFound(req, res);
@@ -320,7 +246,7 @@ async function handle(req, res) {
     const t = db.prepare('SELECT * FROM tickets WHERE token = ?').get(m[1]);
     if (!t) return notFound(req, res);
     if (m[2] && post) {
-      db.prepare(`UPDATE tickets SET status = 'cancelled' WHERE id = ? AND status = 'waiting'`).run(t.id);
+      core.cancelTicket(t);
       return redirect(res, `/t/${t.token}`);
     }
     return send(req, res, 200, ticketPage(t));
@@ -334,24 +260,17 @@ async function handle(req, res) {
   if (p === '/login' || p === '/register') {
     const kind = p.slice(1);
     if (!post) return send(req, res, 200, authPage(kind));
-    if (limited(ip, 'auth', 15, 15 * 60 * 1000)) return send(req, res, 429, authPage(kind, 'محاولات كثيرة، انتظر قليلاً.'));
-    const username = clip(body.username, 30).toLowerCase(), password = String(body.password || '');
+    if (core.isLimited(ip, 'auth')) return send(req, res, 429, authPage(kind, 'محاولات كثيرة، انتظر قليلاً.'));
     let store;
     if (kind === 'register') {
-      const name = clip(body.name, 60);
-      if (!/^[a-z0-9_.-]{3,30}$/.test(username)) return send(req, res, 400, authPage(kind, 'اسم المستخدم: 3 أحرف إنجليزية أو أرقام على الأقل.'));
-      if (password.length < 6 || !name) return send(req, res, 400, authPage(kind, 'أكمل البيانات (كلمة المرور 6 أحرف على الأقل).'));
-      if (db.prepare('SELECT 1 FROM stores WHERE username = ?').get(username)) return send(req, res, 400, authPage(kind, 'اسم المستخدم مستخدم مسبقاً.'));
-      let code; do { code = crypto.randomBytes(3).toString('hex').slice(0, 4); } while (db.prepare('SELECT 1 FROM stores WHERE code = ?').get(code));
-      const r = db.prepare('INSERT INTO stores (code, name, area, username, pass_hash, created_at) VALUES (?,?,?,?,?,?)')
-        .run(code, name, clip(body.area, 60), username, hashPass(password), now());
-      store = { id: Number(r.lastInsertRowid) };
+      const r = core.registerStore(body);
+      if (r.error) return send(req, res, 400, authPage(kind, r.message_ar));
+      store = r.store;
     } else {
-      store = db.prepare('SELECT * FROM stores WHERE username = ?').get(username);
-      if (!store || !checkPass(password, store.pass_hash)) return send(req, res, 401, authPage(kind, 'اسم المستخدم أو كلمة المرور غير صحيحة.'));
+      store = core.loginStore(body.username, body.password);
+      if (!store) return send(req, res, 401, authPage(kind, 'اسم المستخدم أو كلمة المرور غير صحيحة.'));
     }
-    const sid = rand(24);
-    db.prepare('INSERT INTO sessions (token, store_id, expires_at) VALUES (?,?,?)').run(sid, store.id, now() + SESSION_DAYS * 864e5);
+    const sid = core.createSession(store).token;
     const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
     return redirect(res, '/dash', { 'Set-Cookie': `sid=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secure}` });
   }
@@ -361,53 +280,41 @@ async function handle(req, res) {
     const store = currentStore(req);
     if (!store) return redirect(res, '/login');
     if (p === '/logout' && post) {
-      db.prepare('DELETE FROM sessions WHERE token = ?').run(cookies(req).sid);
+      core.deleteSession(cookies(req).sid);
       return redirect(res, '/', { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' });
     }
     if (p === '/dash' && !post) return send(req, res, 200, dashPage(store));
     if (!post) return notFound(req, res);
 
     if (p === '/dash/queue') {
-      const name = clip(body.name, 40);
-      const avg = Math.min(120, Math.max(0.2, Number(body.avg) || 3));
-      if (name) db.prepare('INSERT INTO queues (store_id, name, avg_minutes) VALUES (?,?,?)').run(store.id, name, avg);
+      core.createQueue(store, body.name, body.avg);
       return redirect(res, '/dash');
     }
     if ((m = p.match(/^\/dash\/queue\/(\d+)\/(next|skip|walkin|toggle|reset)$/))) {
-      const q = db.prepare('SELECT * FROM queues WHERE id = ? AND store_id = ?').get(Number(m[1]), store.id);
+      const q = core.queueOf(store.id, m[1]);
       if (!q) return notFound(req, res);
       let msg = '';
       if (m[2] === 'next') { if (!callNext(q)) msg = 'لا يوجد أحد في الانتظار.'; }
-      if (m[2] === 'skip') {
-        db.prepare(`UPDATE tickets SET status = 'skipped' WHERE queue_id = ? AND status = 'called'`).run(q.id);
-        callNext(db.prepare('SELECT * FROM queues WHERE id = ?').get(q.id));
-      }
+      if (m[2] === 'skip') core.skipCurrent(q);
       if (m[2] === 'walkin') msg = `تذكرة جديدة: رقم ${issueTicket(q).number} — اكتبه للشخص على ورقة.`;
-      if (m[2] === 'toggle') db.prepare('UPDATE queues SET is_open = 1 - is_open WHERE id = ?').run(q.id);
-      if (m[2] === 'reset') {
-        db.prepare(`UPDATE tickets SET status = 'cancelled' WHERE queue_id = ? AND status IN ('waiting','called')`).run(q.id);
-        db.prepare('UPDATE queues SET last_number = 0, current_number = 0, last_called_at = NULL WHERE id = ?').run(q.id);
-      }
+      if (m[2] === 'toggle') core.toggleQueue(q);
+      if (m[2] === 'reset') core.resetQueue(q);
       return msg ? send(req, res, 200, dashPage(store, msg)) : redirect(res, '/dash');
     }
     if ((m = p.match(/^\/dash\/order\/(\d+)$/))) {
-      if (['preparing', 'ready', 'picked', 'cancelled'].includes(body.status))
-        db.prepare('UPDATE orders SET status = ? WHERE id = ? AND store_id = ?').run(body.status, Number(m[1]), store.id);
+      core.setOrderStatus(store, m[1], body.status);
       return redirect(res, '/dash');
     }
     if (p === '/dash/settings') {
-      db.prepare('UPDATE stores SET orders_enabled = ? WHERE id = ?').run(body.orders === '1' ? 1 : 0, store.id);
+      core.setOrdersEnabled(store, body.orders === '1');
       return redirect(res, '/dash');
     }
     if (p === '/dash/menu') {
-      const name = clip(body.name, 50);
-      if (name) db.prepare('INSERT INTO menu_items (store_id, name, price) VALUES (?,?,?)').run(store.id, name, clip(body.price, 20));
+      core.addMenuItem(store, body.name, body.price);
       return redirect(res, '/dash');
     }
     if ((m = p.match(/^\/dash\/menu\/(\d+)\/(toggle|delete)$/))) {
-      const sql = m[2] === 'toggle' ? 'UPDATE menu_items SET available = 1 - available WHERE id = ? AND store_id = ?'
-        : 'DELETE FROM menu_items WHERE id = ? AND store_id = ?';
-      db.prepare(sql).run(Number(m[1]), store.id);
+      if (m[2] === 'toggle') core.toggleMenuItem(store, m[1]); else core.deleteMenuItem(store, m[1]);
       return redirect(res, '/dash');
     }
   }
@@ -423,6 +330,6 @@ const server = http.createServer((req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => console.log(`دور running on http://localhost:${PORT}`));
-  setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now()), 864e5).unref();
+  core.startPurge(); // closed tickets/orders > 7 days, expired sessions
 }
 module.exports = server;
