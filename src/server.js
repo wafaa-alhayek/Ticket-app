@@ -40,11 +40,13 @@ const redirect = (res, to, headers = {}) => { res.writeHead(303, { Location: to,
 const currentStore = (req) => core.storeBySession(cookies(req).sid);
 
 // ---------- pages ----------
+// WCAG 2.2.1: auto-refreshing pages offer a way to stop the timed reload (?live=0).
+const liveToggle = (base, live) => `<a class="btn btn2" href="${base}${live ? '?live=0' : ''}">${live ? 'إيقاف التحديث التلقائي' : 'تشغيل التحديث التلقائي'}</a>`;
 function homePage(err = '') {
   return page('الرئيسية', `
 <h1>دور — بدون طوابير</h1>
 <p>احجز دورك في طابور الخبز أو المياه أو الحلاق، أو اطلب مسبقاً واستلم طلبك جاهزاً.</p>
-${err ? `<div class="notice">${esc(err)}</div>` : ''}
+${err ? `<div class="notice" role="alert">${esc(err)}</div>` : ''}
 <div class="card"><form method="get" action="/find">
 <label for="c">رمز المحل أو النقطة</label>
 <input id="c" name="code" required maxlength="12" autocomplete="off" inputmode="latin" placeholder="مثال: ab12">
@@ -67,12 +69,12 @@ ${q.is_open ? `<form method="post" action="/s/${esc(store.code)}/join"><input ty
 <button class="big">احجز دوري</button></form>` : ''}</div>`;
   }).join('') || '<p class="muted">لا توجد طوابير مفتوحة الآن. جرّب لاحقاً.</p>';
   return page(store.name, `<h1>${esc(store.name)}</h1><p class="muted">${esc(store.area)} · الرمز: <b>${esc(store.code)}</b></p>
-${err ? `<div class="notice">${esc(err)}</div>` : ''}
-${store.orders_enabled ? `<a class="btn big" href="/s/${esc(store.code)}/order">🛍️ اطلب مسبقاً واستلم جاهزاً</a>` : ''}
+${err ? `<div class="notice" role="alert">${esc(err)}</div>` : ''}
+${store.orders_enabled ? `<a class="btn big" href="/s/${esc(store.code)}/order"><span aria-hidden="true">🛍️</span> اطلب مسبقاً واستلم جاهزاً</a>` : ''}
 ${qs}<p class="muted"><a href="/s/${esc(store.code)}">تحديث</a></p>`);
 }
 
-function ticketPage(t) {
+function ticketPage(t, live = true) {
   const q = db.prepare('SELECT q.*, s.name sname, s.code FROM queues q JOIN stores s ON s.id = q.store_id WHERE q.id = ?').get(t.queue_id);
   const ahead = t.status === 'waiting' ? waitingAhead(q, t.number) : 0;
   const active = t.status === 'waiting' || t.status === 'called';
@@ -80,35 +82,36 @@ function ticketPage(t) {
 <div class="card tkt ${t.status === 'called' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(q.sname)} — ${esc(q.name)}</p>
 <p class="muted">رقمك</p><div class="num">${t.number}</div>
-<h2 class="st">${STATUS_AR[t.status]}</h2>
+<h1 class="st">${STATUS_AR[t.status]}</h1>
 ${t.status === 'waiting' ? `<div class="perf"></div><table>
-<tr><td>الدور الحالي</td><td><b>${q.current_number || '—'}</b></td></tr>
-<tr><td>أمامك</td><td><b>${ahead}</b> شخص</td></tr>
-<tr><td>الانتظار المتوقع</td><td><b>${mins(ahead * q.avg_minutes)}</b></td></tr></table>
+<tr><th scope="row">الدور الحالي</th><td><b>${q.current_number || '—'}</b></td></tr>
+<tr><th scope="row">أمامك</th><td><b>${ahead}</b> شخص</td></tr>
+<tr><th scope="row">الانتظار المتوقع</th><td><b>${mins(ahead * q.avg_minutes)}</b></td></tr></table>
 ${ahead <= 3 ? '<div class="notice">اقترب دورك، توجّه إلى المكان الآن.</div>' : ''}` : ''}
 ${t.status === 'called' ? '<div class="notice">توجّه إلى الشباك الآن.</div>' : ''}
 </div>
-${active ? `<p class="ok">دورك محفوظ.</p><p class="muted">آخر تحديث: ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit' })} · تتحدث الصفحة تلقائياً كل 30 ثانية. احفظ هذا الرابط أو صوّر الشاشة.</p>
-<div class="row"><a class="btn btn2" href="/t/${esc(t.token)}">تحديث الآن</a>
+${active ? `<p class="ok">دورك محفوظ.</p><p class="muted">آخر تحديث: ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit' })}${live ? ' · تتحدث الصفحة تلقائياً كل 30 ثانية.' : ''} احفظ هذا الرابط أو صوّر الشاشة.</p>
+<div class="row"><a class="btn btn2" href="/t/${esc(t.token)}${live ? '' : '?live=0'}">تحديث الآن</a>
+${liveToggle(`/t/${esc(t.token)}`, live)}
 ${t.status === 'waiting' ? action(`/t/${t.token}/cancel`, 'إلغاء دوري', 'warn') : ''}</div>` : `<a class="btn" href="/s/${esc(q.code)}">احجز دوراً جديداً</a>`}`,
-  { refresh: active ? 30 : 0 });
+  { refresh: active && live ? 30 : 0 });
 }
 
 function screenPage(store) {
   const queues = db.prepare('SELECT * FROM queues WHERE store_id = ? AND is_open = 1 ORDER BY id').all(store.id);
   const ready = store.orders_enabled
     ? db.prepare(`SELECT number FROM orders WHERE store_id = ? AND status = 'ready' ORDER BY id DESC LIMIT 12`).all(store.id) : [];
-  return page('شاشة العرض', `<div class="screen"><h1>${esc(store.name)}</h1>
+  return page('شاشة العرض', `<main class="screen"><h1>${esc(store.name)}</h1>
 ${queues.map((q) => `<h2>${esc(q.name)}</h2><div class="num">${q.current_number || '—'}</div>
 <p>المنتظرون: ${waitingCount(q)} · احجز دورك بالرمز: <b>${esc(store.code)}</b></p>`).join('')}
 ${ready.length ? `<h2>طلبات جاهزة</h2><div class="num" style="font-size:4em">${ready.map((o) => o.number).join(' · ')}</div>` : ''}
-</div>`, { refresh: 10, bare: true });
+</main>`, { refresh: 10, bare: true });
 }
 
 function orderFormPage(store, err = '') {
   const items = db.prepare('SELECT * FROM menu_items WHERE store_id = ? AND available = 1 ORDER BY id').all(store.id);
   return page('اطلب مسبقاً', `<h1>${esc(store.name)} — طلب مسبق</h1>
-${err ? `<div class="notice">${esc(err)}</div>` : ''}
+${err ? `<div class="notice" role="alert">${esc(err)}</div>` : ''}
 <form method="post" class="card" action="/s/${esc(store.code)}/order">
 ${items.length ? `<table><tr><th>الصنف</th><th>السعر</th><th>الكمية</th></tr>
 ${items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.price)}</td><td><input name="qty_${i.id}" aria-label="كمية ${esc(i.name)}" type="number" min="0" max="50" value="0" inputmode="numeric" style="width:5em"></td></tr>`).join('')}</table>`
@@ -120,23 +123,24 @@ ${items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.price)}</td><td><inpu
 <button class="big">أرسل الطلب</button></form>`);
 }
 
-function orderPage(o) {
+function orderPage(o, live = true) {
   const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(o.store_id);
   const items = JSON.parse(o.items);
   const active = ['new', 'preparing', 'ready'].includes(o.status);
   return page(`طلب ${o.number}`, `<div class="card tkt ${o.status === 'ready' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(store.name)}</p><p class="muted">رقم طلبك</p><div class="num">${o.number}</div>
-<h2 class="st">${ORDER_AR[o.status]}</h2><div class="perf"></div>
+<h1 class="st">${ORDER_AR[o.status]}</h1><div class="perf"></div>
 <ul style="text-align:right">${items.map((i) => `<li>${esc(i.name)} × ${i.qty}</li>`).join('')}</ul>
 ${o.note ? `<p>ملاحظات: ${esc(o.note)}</p>` : ''}<p class="muted">الوصول: ${esc(o.pickup)}</p></div>
-${active ? '<p class="muted">تتحدث الصفحة تلقائياً كل 30 ثانية.</p>' : ''}
-<a class="btn btn2" href="/o/${esc(o.token)}">تحديث</a>`, { refresh: active ? 30 : 0 });
+${active && live ? '<p class="muted">تتحدث الصفحة تلقائياً كل 30 ثانية.</p>' : ''}
+<div class="row"><a class="btn btn2" href="/o/${esc(o.token)}${live ? '' : '?live=0'}">تحديث</a>
+${active ? liveToggle(`/o/${esc(o.token)}`, live) : ''}</div>`, { refresh: active && live ? 30 : 0 });
 }
 
 function authPage(kind, err = '') {
   const reg = kind === 'register';
   return page(reg ? 'تسجيل محل' : 'دخول', `<h1>${reg ? 'تسجيل محل / نقطة جديدة' : 'دخول أصحاب المحلات'}</h1>
-${err ? `<div class="notice">${esc(err)}</div>` : ''}
+${err ? `<div class="notice" role="alert">${esc(err)}</div>` : ''}
 <form method="post" class="card" action="/${kind}">
 ${reg ? `<label for="sn">اسم المحل أو النقطة</label><input id="sn" name="name" required maxlength="60" placeholder="مثال: مخبز العائلات">
 <label for="area">المنطقة</label><input id="area" name="area" maxlength="60" placeholder="مثال: دير البلح - السوق">` : ''}
@@ -158,9 +162,9 @@ function dashPage(store, msg = '') {
 <div class="num">${q.current_number || '—'}</div>
 <p style="text-align:center">${serving?.name ? esc(serving.name) + ' · ' : ''}المنتظرون: <b>${waitingCount(q)}</b> · متوسط الخدمة: ${mins(q.avg_minutes)}</p>
 ${next.length ? `<p class="muted">التالي: ${next.map((t) => t.number + (t.name ? ` (${esc(t.name)})` : '')).join('، ')}</p>` : ''}
-${action(b + '/next', '▶ نادِ التالي', 'big')}
+${action(b + '/next', '<span aria-hidden="true">▶</span> نادِ التالي', 'big')}
 <div class="row">${action(b + '/skip', 'تخطّي الحالي (غير موجود)', 'btn2')}
-${action(b + '/walkin', '+ تذكرة ورقية لمن لا يملك جوالاً', 'btn2')}
+${action(b + '/walkin', '<span aria-hidden="true">+</span> تذكرة ورقية لمن لا يملك جوالاً', 'btn2')}
 ${action(b + '/toggle', q.is_open ? 'إغلاق الحجز' : 'فتح الحجز', 'btn2')}
 ${action(b + '/reset', 'يوم جديد (تصفير الطابور)', 'warn')}</div></div>`;
   }).join('');
@@ -174,10 +178,10 @@ ${o.status !== 'ready' ? action(b, 'جاهز', '', { status: 'ready' }) : action
 ${action(b, 'إلغاء', 'btn2', { status: 'cancelled' })}</div></td></tr>`;
   }).join('');
   return page('لوحة المحل', `<h1>${esc(store.name)}</h1>
-${msg ? `<div class="notice">${esc(msg)}</div>` : ''}
+${msg ? `<div class="notice" role="status">${esc(msg)}</div>` : ''}
 <div class="card"><p>رمز محلك للزبائن: <b style="font-size:1.4em">${esc(store.code)}</b></p>
 <p class="muted">صفحة الحجز: <a href="/s/${esc(store.code)}" dir="ltr">/s/${esc(store.code)}</a> · شاشة العرض: <a href="/s/${esc(store.code)}/screen" dir="ltr">/s/${esc(store.code)}/screen</a></p>
-<div class="row"><a class="btn" href="/s/${esc(store.code)}/poster">🖨️ ملصق QR للطباعة</a><a class="btn btn2" href="/dash">تحديث</a></div></div>
+<div class="row"><a class="btn" href="/s/${esc(store.code)}/poster"><span aria-hidden="true">🖨️</span> ملصق QR للطباعة</a><a class="btn btn2" href="/dash">تحديث</a></div></div>
 ${qHtml}
 <form method="post" class="card" action="/dash/queue"><h2>إضافة طابور</h2>
 <label for="qn">اسم الطابور</label><input id="qn" name="name" required maxlength="40" placeholder="مثال: خبز، مياه، حلاقة">
@@ -185,9 +189,9 @@ ${qHtml}
 <button>إضافة</button></form>
 <div class="card"><h2>الطلبات المسبقة</h2>
 ${action('/dash/settings', store.orders_enabled ? 'إيقاف الطلب المسبق' : 'تفعيل الطلب المسبق', 'btn2', { orders: store.orders_enabled ? 0 : 1 })}
-${store.orders_enabled ? (orders.length ? `<table><tr><th>#</th><th>الزبون</th><th>الطلب</th><th>الحالة</th><th></th></tr>${oHtml}</table>` : '<p class="muted">لا توجد طلبات الآن.</p>') : ''}</div>
+${store.orders_enabled ? (orders.length ? `<div class="tw"><table><tr><th scope="col">#</th><th scope="col">الزبون</th><th scope="col">الطلب</th><th scope="col">الحالة</th><th scope="col"><span class="vh">إجراءات</span></th></tr>${oHtml}</table></div>` : '<p class="muted">لا توجد طلبات الآن.</p>') : ''}</div>
 ${store.orders_enabled ? `<div class="card"><h2>القائمة</h2><table>${menu.map((m) => `<tr><td>${esc(m.name)}</td><td>${esc(m.price)}</td>
-<td><div class="row">${action(`/dash/menu/${m.id}/toggle`, m.available ? 'متوفر' : 'غير متوفر', 'btn2')}${action(`/dash/menu/${m.id}/delete`, 'حذف', 'warn')}</div></td></tr>`).join('')}</table>
+<td><div class="row">${action(`/dash/menu/${m.id}/toggle`, m.available ? 'اجعله غير متوفر' : 'اجعله متوفراً', 'btn2')}${action(`/dash/menu/${m.id}/delete`, 'حذف', 'warn')}</div></td></tr>`).join('')}</table>
 <form method="post" action="/dash/menu"><label for="mn">صنف جديد</label><input id="mn" name="name" required maxlength="50">
 <label for="mp">السعر (اختياري)</label><input id="mp" name="price" maxlength="20"><button>إضافة صنف</button></form></div>` : ''}
 ${action('/logout', 'تسجيل الخروج', 'btn2')}`, { nav: '<a href="/dash">اللوحة</a>' });
@@ -291,11 +295,11 @@ async function handle(req, res) {
       core.cancelTicket(t);
       return redirect(res, `/t/${t.token}`);
     }
-    return send(req, res, 200, ticketPage(t));
+    return send(req, res, 200, ticketPage(t, url.searchParams.get('live') !== '0'));
   }
   if ((m = p.match(/^\/o\/([\w-]+)$/))) {
     const o = db.prepare('SELECT * FROM orders WHERE token = ?').get(m[1]);
-    return o ? send(req, res, 200, orderPage(o)) : notFound(req, res);
+    return o ? send(req, res, 200, orderPage(o, url.searchParams.get('live') !== '0')) : notFound(req, res);
   }
 
   // ----- store auth -----

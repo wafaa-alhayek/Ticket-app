@@ -29,11 +29,11 @@ test('store registers, client takes ticket, store calls it, pre-order works', as
   const t2 = await req(`/s/${code}/join`, { queue_id: qid, phone: '0599222222' });
   const dup = await req(`/s/${code}/join`, { queue_id: qid, phone: '0599111111' });
   assert.equal(dup.loc, t1.loc, 'same phone gets the same ticket');
-  assert.match((await req(t2.loc)).text, /أمامك<\/td><td><b>1<\/b>/);
+  assert.match((await req(t2.loc)).text, /أمامك<\/th><td><b>1<\/b>/);
 
   await req(`/dash/queue/${qid}/next`, {}, true);
   assert.match((await req(t1.loc)).text, /حان دورك/);
-  assert.match((await req(t2.loc)).text, /أمامك<\/td><td><b>0<\/b>/);
+  assert.match((await req(t2.loc)).text, /أمامك<\/th><td><b>0<\/b>/);
   r = await req(`/dash/queue/${qid}/walkin`, {}, true);
   assert.match(r.text, /رقم 3/);
 

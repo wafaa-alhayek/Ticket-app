@@ -25,7 +25,11 @@ button,.btn{display:inline-block;min-height:48px;min-width:44px;padding:10px 18p
 .btn2{background:#e7e2d6;color:#1d1d1b;box-shadow:inset 0 -3px 0 #ccc4b3}.warn{background:#9a3412}.big{font-size:1.2em;padding:14px 22px;width:100%;min-height:56px}
 a{color:#14532d}
 a:focus,button:focus,input:focus,select:focus,textarea:focus{outline:3px solid #b45309;outline-offset:2px}
-.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+header a{display:inline-block;padding:8px 4px;min-height:44px}
+header a:focus,header a:focus-visible{outline-color:#facc15}
+main p>a:only-child{display:inline-block;min-height:44px;padding:10px 0}
+.tw{overflow-x:auto}th[scope=row]{font-weight:normal}
+.vh{position:absolute;margin:-1px;padding:0;border:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row form{margin:0}
 .num{font-size:4.5em;font-weight:bold;text-align:center;color:#14532d;line-height:1.05;letter-spacing:-.02em}
 .muted{color:#5c5648;font-size:.9em}.ok{color:#14532d;font-weight:bold}.bad{color:#9a3412;font-weight:bold}

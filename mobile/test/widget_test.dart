@@ -156,4 +156,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(posted, ['/api/v1/operator/queues/1/next']);
   });
+
+  // Accessibility: Android "largest font" (2.0) on a 360 dp phone must not overflow,
+  // and the ticket number is announced with its label.
+  Widget scaled(Widget w) => MaterialApp(
+      home: MediaQuery(
+          data: const MediaQueryData(
+              size: Size(360, 740), textScaler: TextScaler.linear(2.0)),
+          child: Directionality(textDirection: TextDirection.rtl, child: w)));
+
+  testWidgets('ticket screen at textScaler 2.0: no overflow, number has label',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final handle = tester.ensureSemantics();
+    final d = await deps(MockClient((r) async => j({
+          'token': 'tk',
+          'number': 53,
+          'status': 'waiting',
+          'current_number': 40,
+          'ahead': 2,
+          'est_wait_min': 12
+        })));
+    await tester.pumpWidget(scaled(TicketScreen(deps: d, token: 'tk')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.bySemanticsLabel('${S.yourNumber} 53'), findsOneWidget);
+    handle.dispose();
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('operator dashboard at textScaler 2.0 has no overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final d = await deps(MockClient((r) async => j({
+          'code': 'ABCD',
+          'name': 'مخبز العائلات في دير البلح',
+          'queues': [
+            {'id': 1, 'name': 'خبز', 'open': true, 'current_number': 120, 'waiting': 34}
+          ]
+        })));
+    d.api.token = 'T';
+    await tester.pumpWidget(scaled(OperatorDashboardScreen(deps: d)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final next = tester.getSize(find.byKey(const Key('next-1')));
+    expect(next.height, greaterThanOrEqualTo(48));
+  });
 }

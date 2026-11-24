@@ -114,7 +114,7 @@ class _OperatorOrdersScreenState extends State<OperatorOrdersScreen> {
                         for (final l in o.items) Text('${l.qty} × ${l.name}'),
                         if (o.note.isNotEmpty)
                           Text(o.note,
-                              style: const TextStyle(color: Colors.black54)),
+                              style: const TextStyle(color: Color(0xFF5C5648))),
                         Wrap(spacing: 8, children: [
                           if (o.status == 'new')
                             OutlinedButton(
@@ -146,7 +146,10 @@ class _OperatorOrdersScreenState extends State<OperatorOrdersScreen> {
                   child: Text(S.preorder,
                       style: TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold))),
-              IconButton(icon: const Icon(Icons.add), onPressed: _addItem),
+              IconButton(
+                  tooltip: S.add,
+                  icon: const Icon(Icons.add),
+                  onPressed: _addItem),
             ]),
             SwitchListTile(
                 title: const Text(S.ordersEnabled),
@@ -160,10 +163,14 @@ class _OperatorOrdersScreenState extends State<OperatorOrdersScreen> {
                 title: Text(it.name),
                 subtitle: Text(it.available ? it.price : S.unavailable),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Switch(
-                      value: it.available,
-                      onChanged: (_) => _run(() => api.toggleMenuItem(it.id))),
+                  Semantics(
+                      label: '${S.available} ${it.name}',
+                      child: Switch(
+                          value: it.available,
+                          onChanged: (_) =>
+                              _run(() => api.toggleMenuItem(it.id)))),
                   IconButton(
+                      tooltip: '${S.delete} ${it.name}',
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _run(() => api.deleteMenuItem(it.id))),
                 ]),

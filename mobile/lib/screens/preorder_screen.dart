@@ -82,12 +82,14 @@ class _PreorderScreenState extends State<PreorderScreen> {
               trailing: it.available
                   ? Row(mainAxisSize: MainAxisSize.min, children: [
                       IconButton(
+                          tooltip: '${S.decrease} ${it.name}',
                           icon: const Icon(Icons.remove),
                           onPressed: () => setState(() =>
                               _qty[it.id] = ((_qty[it.id] ?? 0) - 1).clamp(0, 99))),
                       Text('${_qty[it.id] ?? 0}',
                           style: const TextStyle(fontSize: 18)),
                       IconButton(
+                          tooltip: '${S.increase} ${it.name}',
                           icon: const Icon(Icons.add),
                           onPressed: () => setState(() =>
                               _qty[it.id] = ((_qty[it.id] ?? 0) + 1).clamp(0, 99))),

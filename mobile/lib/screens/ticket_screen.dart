@@ -113,12 +113,15 @@ class _TicketScreenState extends State<TicketScreen> {
                   value: t.number,
                   highlight: t.status == 'called'),
               const SizedBox(height: 12),
-              Text(S.ticketStatus[t.status] ?? t.status,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: kGreen)),
+              Semantics(
+                  liveRegion: true,
+                  header: true,
+                  child: Text(S.ticketStatus[t.status] ?? t.status,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: kGreen))),
               if (t.status == 'called') _notice(S.calledNotice),
               if (t.status == 'waiting') ...[
                 if (t.ahead <= 3) _notice(S.nearWarning),
@@ -140,7 +143,7 @@ class _TicketScreenState extends State<TicketScreen> {
                 Text('${S.lastUpdate}: ${hhmm(_at!)}',
                     key: const Key('lastUpdate'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.black54)),
+                    style: const TextStyle(color: Color(0xFF5C5648))),
               const SizedBox(height: 12),
               if (t.active) ...[
                 ElevatedButton(onPressed: _poll, child: const Text(S.refresh)),
@@ -153,7 +156,7 @@ class _TicketScreenState extends State<TicketScreen> {
     );
   }
 
-  Widget _notice(String s) => Container(
+  Widget _notice(String s) => Semantics(liveRegion: true, child: Container(
         margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -161,5 +164,5 @@ class _TicketScreenState extends State<TicketScreen> {
         child: Text(s,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      );
+      ));
 }
