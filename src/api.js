@@ -12,17 +12,17 @@ const CORS = {
 };
 
 const MSG = {
-  bad_json: 'صيغة الطلب غير صحيحة.',
-  invalid_input: 'بيانات غير مكتملة أو غير صحيحة.',
-  queue_closed: 'هذا الطابور مغلق.',
-  orders_disabled: 'الطلب المسبق غير مفعّل في هذا المحل.',
-  username_taken: 'اسم المستخدم مستخدم مسبقاً.',
-  unauthorized: 'يجب تسجيل الدخول.',
+  bad_json: 'تعذّرت قراءة الطلب. جرّب مرة ثانية.',
+  invalid_input: 'بعض البيانات ناقصة. راجعها وجرّب مرة ثانية.',
+  queue_closed: 'الحجز في هذا الطابور مغلق الآن. جرّب لاحقاً.',
+  orders_disabled: 'هذا المحل لا يستقبل طلبات مسبقة الآن.',
+  username_taken: 'اسم المستخدم محجوز. اختر اسماً آخر.',
+  unauthorized: 'سجّل الدخول للمتابعة.',
   bad_credentials: 'اسم المستخدم أو كلمة المرور غير صحيحة.',
-  not_found: 'غير موجود.',
-  not_cancellable: 'لا يمكن إلغاء هذه التذكرة.',
-  rate_limited: 'طلبات كثيرة من هذا الجهاز، حاول لاحقاً.',
-  server_error: 'حدث خطأ، حاول مرة أخرى.',
+  not_found: 'لم نجد ما تبحث عنه. تأكد من الرابط أو الرمز.',
+  not_cancellable: 'لا يمكن إلغاء هذا الدور الآن.',
+  rate_limited: 'طلبات كثيرة من هذا الجهاز. انتظر دقيقة وجرّب مرة ثانية.',
+  server_error: 'تعذّر إكمال طلبك. جرّب مرة ثانية.',
 };
 const STATUS = { bad_json: 400, invalid_input: 400, queue_closed: 400, orders_disabled: 400, username_taken: 400,
   unauthorized: 401, bad_credentials: 401, not_found: 404, not_cancellable: 409, rate_limited: 429, server_error: 500 };
@@ -46,7 +46,7 @@ function readJson(req) {
   return new Promise((resolve, reject) => {
     let data = '';
     req.setEncoding('utf8');
-    req.on('data', (c) => { data += c; if (data.length > 1e5) { reject(new ApiError('invalid_input', 'الطلب كبير جداً.')); req.destroy(); } });
+    req.on('data', (c) => { data += c; if (data.length > 1e5) { reject(new ApiError('invalid_input', 'الطلب طويل جداً. اختصره وجرّب مرة ثانية.')); req.destroy(); } });
     req.on('end', () => {
       if (!data.trim()) return resolve({});
       try {
@@ -179,7 +179,7 @@ route('GET', '/operator/orders', ({ store, url }) => {
   return [200, { orders: rows.map((o) => orderView(o, true)) }];
 }, true);
 route('POST', '/operator/orders/:id/status', ({ store, params, body }) => {
-  if (!core.ORDER_STATUSES.includes(body.status)) fail('invalid_input', 'حالة غير صحيحة.');
+  if (!core.ORDER_STATUSES.includes(body.status)) fail('invalid_input', 'اختر حالة من القائمة.');
   if (!core.setOrderStatus(store, params.id, body.status)) fail('not_found');
   return [200, { order: orderView(db.prepare('SELECT * FROM orders WHERE id = ?').get(Number(params.id)), true) }];
 }, true);
@@ -196,7 +196,7 @@ route('POST', '/operator/menu/:id/delete', ({ store, params }) => {
   return [200, { ok: true }];
 }, true);
 route('POST', '/operator/settings', ({ store, body }) => {
-  if (typeof body.orders_enabled !== 'boolean') fail('invalid_input', 'orders_enabled يجب أن تكون true أو false.');
+  if (typeof body.orders_enabled !== 'boolean') fail('invalid_input', 'اختر: تفعيل أو إيقاف الطلب المسبق (true أو false).');
   core.setOrdersEnabled(store, body.orders_enabled);
   return [200, { store: operatorStore(core.storeById(store.id)) }];
 }, true);
