@@ -77,11 +77,11 @@ function ticketPage(t) {
   const ahead = t.status === 'waiting' ? waitingAhead(q, t.number) : 0;
   const active = t.status === 'waiting' || t.status === 'called';
   return page(`تذكرة ${t.number}`, `
-<div class="card ${t.status === 'called' ? 'called' : ''}" role="status" aria-live="polite">
+<div class="card tkt ${t.status === 'called' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(q.sname)} — ${esc(q.name)}</p>
 <p class="muted">رقمك</p><div class="num">${t.number}</div>
-<h2 style="text-align:center">${STATUS_AR[t.status]}</h2>
-${t.status === 'waiting' ? `<table>
+<h2 class="st">${STATUS_AR[t.status]}</h2>
+${t.status === 'waiting' ? `<div class="perf"></div><table>
 <tr><td>الدور الحالي</td><td><b>${q.current_number || '—'}</b></td></tr>
 <tr><td>أمامك</td><td><b>${ahead}</b> شخص</td></tr>
 <tr><td>الانتظار المتوقع</td><td><b>${mins(ahead * q.avg_minutes)}</b></td></tr></table>
@@ -124,10 +124,10 @@ function orderPage(o) {
   const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(o.store_id);
   const items = JSON.parse(o.items);
   const active = ['new', 'preparing', 'ready'].includes(o.status);
-  return page(`طلب ${o.number}`, `<div class="card ${o.status === 'ready' ? 'called' : ''}" role="status" aria-live="polite">
+  return page(`طلب ${o.number}`, `<div class="card tkt ${o.status === 'ready' ? 'called' : ''}" role="status" aria-live="polite">
 <p>${esc(store.name)}</p><p class="muted">رقم طلبك</p><div class="num">${o.number}</div>
-<h2 style="text-align:center">${ORDER_AR[o.status]}</h2>
-<ul>${items.map((i) => `<li>${esc(i.name)} × ${i.qty}</li>`).join('')}</ul>
+<h2 class="st">${ORDER_AR[o.status]}</h2><div class="perf"></div>
+<ul style="text-align:right">${items.map((i) => `<li>${esc(i.name)} × ${i.qty}</li>`).join('')}</ul>
 ${o.note ? `<p>ملاحظات: ${esc(o.note)}</p>` : ''}<p class="muted">الوصول: ${esc(o.pickup)}</p></div>
 ${active ? '<p class="muted">تتحدث الصفحة تلقائياً كل 30 ثانية.</p>' : ''}
 <a class="btn btn2" href="/o/${esc(o.token)}">تحديث</a>`, { refresh: active ? 30 : 0 });
